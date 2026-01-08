@@ -2,7 +2,6 @@
 
 Documentation for the collection.
 
-
 ## Sample inventory source variables
 
 ```yaml
@@ -31,3 +30,9 @@ hostnames:
 compose:
   ansible_host: private_ip   # or public_ip
 ```
+
+## Custom Execution Environment
+
+The inventory sync plugin must be inside the [execution environment](https://github.com/iamgini/ansible-aap-demos/tree/main/ansible-ee-cloud-terraform) container image if you are using the Ansible Automation Platform (or AWX).
+
+See the sample [execution-environment.yml](https://github.com/iamgini/ansible-aap-demos/tree/main/ansible-ee-cloud-terraform).
