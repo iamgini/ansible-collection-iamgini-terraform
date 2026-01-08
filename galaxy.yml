@@ -1,0 +1,15 @@
+namespace: iamgini
+name: terraform
+version: 1.0.0
+readme: README.md
+authors:
+  - Gineesh Madapparambath
+description: Inventory plugin for Terraform Enterprise / Cloud using TFE API (no Terraform CLI).
+license:
+  - MIT
+tags:
+  - terraform
+  - terraformenterprise
+  - inventory
+  - automationcontroller
+repository: https://your.internal.repo/iamgini-terraform
