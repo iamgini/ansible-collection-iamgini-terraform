@@ -4,17 +4,17 @@
   gather_facts: false
   vars:
     tag: ''
-    collection_name: 'wordpress'
+    collection_name: 'terraform'
   tasks:
     - name: Ensure the ANSIBLE_GALAXY_TOKEN environment variable is set.
       fail:
         msg: ANSIBLE_GALAXY_TOKEN is not set.
       when: "lookup('env','ANSIBLE_GALAXY_TOKEN') == ''"
 
-    - name: Templating galaxy.yml file.
-      template:
-        src: templates/galaxy.yaml.j2
-        dest: ../galaxy.yml
+    # - name: Templating galaxy.yml file.
+    #   template:
+    #     src: templates/galaxy.yaml.j2
+    #     dest: ../galaxy.yml
 
     - name: Build the collection.
       command: >

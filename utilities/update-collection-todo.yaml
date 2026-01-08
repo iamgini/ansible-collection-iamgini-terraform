@@ -1,0 +1,100 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    tag: ""   # optional override; if empty we try to read latest tag
+    repo_root: "{{ playbook_dir }}/.."
+    repo_prefix: "ansible-collection-"
+
+  tasks:
+    - name: Ensure the ANSIBLE_GALAXY_TOKEN environment variable is set
+      fail:
+        msg: ANSIBLE_GALAXY_TOKEN is not set.
+      when: lookup('env','ANSIBLE_GALAXY_TOKEN') | trim == ""
+
+    - name: Get git remote URL (origin)
+      command: git -C "{{ repo_root }}" remote get-url origin
+      register: git_remote
+      changed_when: false
+
+    - name: Normalize repo URL (strip .git and convert ssh -> https)
+      set_fact:
+        repo_url_raw: "{{ git_remote.stdout | trim }}"
+        repo_url: >-
+          {{
+            (git_remote.stdout | trim)
+            | regex_replace('\\.git$', '')
+            | regex_replace('^git@github.com:', 'https://github.com/')
+            | regex_replace('^ssh://git@github.com/', 'https://github.com/')
+          }}
+
+    - name: Get repo folder name
+      command: basename "{{ repo_root }}"
+      register: repo_dir
+      changed_when: false
+
+    - name: Derive namespace and collection_name from repo folder name
+      set_fact:
+        repo_name: "{{ repo_dir.stdout | trim }}"
+        # expected: ansible-collection-<namespace>-<collection>
+        namespace: "{{ (repo_dir.stdout | trim) | regex_replace('^' + repo_prefix, '') | split('-') | first }}"
+        collection_name: "{{ (repo_dir.stdout | trim) | regex_replace('^' + repo_prefix, '') | split('-') | last }}"
+      failed_when: >
+        not (repo_dir.stdout | trim).startswith(repo_prefix) or
+        ((repo_dir.stdout | trim) | regex_replace('^' + repo_prefix, '') | split('-') | length) < 2
+
+    - name: Determine tag from git (if not provided)
+      command: git -C "{{ repo_root }}" describe --tags --abbrev=0
+      register: git_tag
+      changed_when: false
+      failed_when: false
+      when: tag | trim == ""
+
+    - name: Set effective tag/version
+      set_fact:
+        tag_effective: >-
+          {{
+            (tag | trim)
+            if (tag | trim) != ""
+            else (git_tag.stdout | trim)
+          }}
+        version_effective: >-
+          {{
+            (
+              (tag | trim) if (tag | trim) != "" else (git_tag.stdout | trim)
+            )
+            | regex_replace('^v', '')
+          }}
+
+    - name: Build derived links for galaxy.yml
+      set_fact:
+        repository: "{{ repo_url }}"
+        homepage: "{{ repo_url }}"
+        issues: "{{ repo_url }}/issues"
+        documentation: "{{ repo_url }}"
+        galaxy_ui: "https://galaxy.ansible.com/ui/repo/published/{{ namespace }}/{{ collection_name }}/"
+
+    - name: Template galaxy.yml file
+      template:
+        src: templates/galaxy.yaml.j2
+        dest: "{{ repo_root }}/galaxy.yml"
+
+    - name: Build the collection
+      command: ansible-galaxy collection build --force
+      args:
+        chdir: "{{ repo_root }}"
+
+    - name: Publish the collection
+      command: >
+        ansible-galaxy collection publish
+        ./{{ namespace }}-{{ collection_name }}-{{ version_effective }}.tar.gz
+        --api-key {{ lookup('env','ANSIBLE_GALAXY_TOKEN') }}
+        --ignore-certs
+      args:
+        chdir: "{{ repo_root }}"
+      register: galaxy_publish_status
+
+    - name: Galaxy Publish Status
+      debug:
+        var: galaxy_publish_status
